@@ -22,6 +22,8 @@
 
 #include <windows.h> // for Beep()
 #include <iostream>
+#include <thread>
+#include "tray_icon.h"
 
 
 #pragma comment(lib, "XInput9_1_0.lib")
@@ -44,40 +46,51 @@ int main()
 {
   CXBOXController controller(1);
   Gopher gopher(&controller);
-  HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
   SetConsoleTitle( TEXT( "Gopher360" ) );
 
-  system("Color 1D");
+  //... setup tray icon ..............
+  std::this_thread::sleep_for(std::chrono::milliseconds{ 75 }); //need sleep for ensure title changing
+  auto consoleWindow = FindWindow(NULL, TEXT("Gopher360")); //find real console window
+  TrayIcon trayIcon(consoleWindow); //create associated with fake window and console window
+  SetConsoleCtrlHandler(TrayIcon::CtrlHandler, true);
+  //..................................
 
   printf("Welcome to Gopher360 - a VERY fast and lightweight controller-to-keyboard & mouse input tool.\n");
   printf("All you need is an Xbox360/Xbone controller (wired or wireless adapter), or DualShock (with InputMapper 1.5+)\n");
   printf("Gopher will autofind the xinput device and begin reading input - if nothing happens, verify connectivity.\n");
-  printf("See the GitHub repository at bit.ly/1syAhMT for more info. Twitter contact: TylerAt60FPS\n\n-------------------------\n\n");
+  printf("See original GitHub repository at bit.ly/1syAhMT for more info. See improved repository (this software) at https://github.com/DimmanT/Gopher360. \n");
+  printf("\n-------------------------\n\n");
   
-  SetConsoleTextAttribute(hConsole, 23);
   printf("Gopher is free (as in freedom) software: you can redistribute it and/or modify\nit under the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n");
   printf("\nYou should have received a copy of the GNU General Public License\nalong with this program. If not, see http://www.gnu.org/licenses/.");
-  SetConsoleTextAttribute(hConsole, 29);
   printf("\n\n-------------------------\n\n");
 
-  SetConsoleTextAttribute(hConsole, 5); // set color to purple on black (windows only)
-  // 29 default
 
   // dump important tips
-  printf("Tip - Press left and right bumpers simultaneously to toggle speeds! (Default is left and right bumpers, configurable in config.ini)\n");
+  printf("Tip - Press left and right bumpers simultaneously to toggle speeds! (Default is left and right bumpers, configurable in config.ini). Change first record in CURSOR_SPEED parameter of config.ini to setup default speed.\n");
 
   if (!isRunningAsAdministrator())
   {
     printf("Tip - Not running as an admin! Windows on-screen keyboard and others won't work without admin rights.\n");
   }
 
-  gopher.loadConfigFile();
+  printf("Tip - Use system tray icon to hide or show this window. You can set HIDE_ON_STARTUP=YES in 'config.ini' to hide this window after start program.\n");
 
-  // Start the Gopher program loop
-  while (true)
-  {
-    gopher.loop();
+  gopher.loadConfigFile();
+  trayIcon.loadConfigFile();
+
+  MSG message;
+  while (TrayIcon::run) {
+      gopher.loop();
+      // ... getting messages from tray icon ...
+      if (PeekMessage(&message, NULL, 0, 0, 0)) {
+          TranslateMessage(&message);
+          DispatchMessage(&message);
+      }
+      //.........................................
   }
+
+  return 0;
 }
 
 BOOL isRunningAsAdministrator()
